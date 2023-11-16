@@ -1,74 +1,73 @@
 #!/usr/bin/env python3
 """
-Main Module
+BD class
 """
-from db import DB
-from user import User
+
+from sqlalchemy import create_engine
 from sqlalchemy.exc import InvalidRequestError
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
+from typing import TypeVar
+from user import Base, User
 
 
-def register_user(email: str, password: str) -> None:
-    """register_user"""
-    assert True
-    return
+DATA = ['id', 'email', 'hashed_password', 'session_id', 'reset_token']
 
 
-def log_in_wrong_password(email: str, password: str) -> None:
-    """log_in_wrong_password"""
-    assert True
-    return
+class DB:
 
+    def __init__(self):
+        self._engine = create_engine("sqlite:///a.db", echo=False)
+        Base.metadata.drop_all(self._engine)
+        Base.metadata.create_all(self._engine)
+        self.__session = None
 
-def log_in(email: str, password: str) -> str:
-    """log_in"""
-    assert True
-    return ("")
+    @property
+    def _session(self):
+        if self.__session is None:
+            DBSession = sessionmaker(bind=self._engine)
+            self.__session = DBSession()
+        return self.__session
 
+    def add_user(self, email: str, hashed_password: str) -> User:
+        """add user to database
 
-def profile_unlogged() -> None:
-    """profile_unlogged"""
-    assert True
-    return
+        Args:
+            email (string): email of user
+            hashed_password (string): password of user
+        Returns:
+            User: user created
+        """
+        if not email or not hashed_password:
+            return
+        user = User(email=email, hashed_password=hashed_password)
+        session = self._session
+        session.add(user)
+        session.commit()
+        return user
 
+    def find_user_by(self, **kwargs) -> User:
+        """find user by some arguments
 
-def profile_logged(session_id: str) -> None:
-    """profile_logged"""
-    assert True
-    return
+        Returns:
+            User: user found or raise error
+        """
+        user = self._session.query(User).filter_by(**kwargs).first()
+        if not user:
+            raise NoResultFound
+        return user
 
+    def update_user(self, user_id: int, **kwargs) -> None:
+        """Update user
 
-def log_out(session_id: str) -> None:
-    """log_out"""
-    assert True
-    return
-
-
-def reset_password_token(email: str) -> str:
-    """reset_password_token"""
-    assert True
-    return ("")
-
-
-def update_password(reset_token: str, new_password: str) -> None:
-    """update_password"""
-    assert True
-    return
-
-
-EMAIL = "guillaume@holberton.io"
-PASSWD = "b4l0u"
-NEW_PASSWD = "t4rt1fl3tt3"
-
-
-if __name__ == "__main__":
-
-    register_user(EMAIL, PASSWD)
-    log_in_wrong_password(EMAIL, NEW_PASSWD)
-    profile_unlogged()
-    session_id = log_in(EMAIL, PASSWD)
-    profile_logged(session_id)
-    log_out(session_id)
-    reset_token = reset_password_token(EMAIL)
-    update_password(EMAIL, reset_token)
-    log_in(EMAIL, NEW_PASSWD)
+        Args:
+            user_id (int): id of user
+        """
+        user = self.find_user_by(id=user_id)
+        for key, val in kwargs.items():
+            if key not in DATA:
+                raise ValueError
+            setattr(user, key, val)
+        self._session.commit()
+        return None
